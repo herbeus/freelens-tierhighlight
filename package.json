@@ -1,0 +1,35 @@
+{
+  "name": "@herbeus/freelens-tierhighlight",
+  "version": "1.0.0",
+  "description": "Colors the Freelens cluster view by tier (e.g. red frame for prod) based on cluster name or kubeconfig context",
+  "type": "module",
+  "main": "dist/main.js",
+  "renderer": "dist/renderer.js",
+  "engines": {
+    "node": ">=22.0.0",
+    "freelens": "^2.0.0"
+  },
+  "scripts": {
+    "build": "rm -rf dist && webpack --config webpack.config.cjs",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "devDependencies": {
+    "@freelensapp/extensions": "^2.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "mobx": "^7.0.0",
+    "mobx-react": "^10.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.9.0",
+    "webpack": "^5.100.0",
+    "webpack-cli": "^6.0.0"
+  },
+  "keywords": ["freelens", "extension", "cluster", "production", "highlight"],
+  "license": "MIT"
+}
