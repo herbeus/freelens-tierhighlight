@@ -1,11 +1,13 @@
 import React from "react";
 import { Renderer } from "@freelensapp/extensions";
-import { reaction, IReactionDisposer } from "mobx";
+import { computed, reaction, IReactionDisposer } from "mobx";
 import { observer } from "mobx-react";
 import { matchRule, parseRules, DEFAULT_RULES } from "./rules";
 import { tierHighlightStore } from "./store";
+import { installGuard, GuardState } from "./guard";
+import { confirmActions } from "./dialog";
 
-const { SubTitle, Input, Switch } = Renderer.Component;
+const { SubTitle, Input, Switch, Notifications } = Renderer.Component;
 
 const FRAME_ID = "tierhighlight-frame";
 const STYLE_ID = "tierhighlight-style";
@@ -57,9 +59,11 @@ const TierHighlightPreference = observer(() => (
       }}
     />
     <span style={{ marginTop: "8px", display: "block" }}>
-      Comma separated <code>pattern=color[:label]</code>, matched case-insensitively
-      against cluster name and kubeconfig context; first match wins. Example:{" "}
-      <code>prod=#d32f2f:PROD, stag=#f9a825, dev=#2e7d32</code>
+      Comma separated <code>pattern=color[:label[:mode]]</code>, matched case-insensitively
+      against cluster name and kubeconfig context; first match wins. Mode{" "}
+      <code>confirm</code> asks you to type the cluster name before any change (delete,
+      edit, scale, create, Helm, cordon/drain), <code>readonly</code> blocks changes.
+      Example: <code>prod=#d32f2f:PROD:confirm, stag=#f9a825:STAGE, dev=#2e7d32</code>
     </span>
     <div style={{ minHeight: "24px" }} />
     <Switch
@@ -73,8 +77,27 @@ const TierHighlightPreference = observer(() => (
   </section>
 ));
 
+/** "gke_project_zone_shared-k8s-prod" -> "shared-k8s-prod" */
+function shortClusterName(name: string): string {
+  const parts = name.split("_").filter(Boolean);
+  return parts[parts.length - 1] ?? name;
+}
+
+const activeRule = computed(() => {
+  const cluster = Renderer.Catalog.activeCluster.get();
+  const name = cluster?.getName() ?? "";
+  const rule = matchRule(parseRules(tierHighlightStore.rules), [name, cluster?.spec?.kubeconfigContext]);
+  return { rule, name };
+});
+
+function guardState(): GuardState {
+  const { rule, name } = activeRule.get();
+  if (!rule || !name) return { mode: "none", expected: "", label: "", color: "" };
+  return { mode: rule.mode, expected: shortClusterName(name), label: rule.label, color: rule.color };
+}
+
 export default class TierHighlightRenderer extends Renderer.LensExtension {
-  private dispose?: IReactionDisposer;
+  private disposers: (() => void)[] = [];
 
   appPreferences = [
     {
@@ -89,17 +112,13 @@ export default class TierHighlightRenderer extends Renderer.LensExtension {
   onActivate() {
     tierHighlightStore.loadExtension(this);
 
-    // Cluster views are iframes; only draw there so the frame surrounds
+    // Cluster views are iframes; only act there so the frame surrounds
     // exactly the cluster being worked on and never doubles up.
     if (window.top === window) return;
 
-    this.dispose = reaction(
+    const disposeFrame: IReactionDisposer = reaction(
       () => {
-        const cluster = Renderer.Catalog.activeCluster.get();
-        const rule = matchRule(parseRules(tierHighlightStore.rules), [
-          cluster?.getName(),
-          cluster?.spec?.kubeconfigContext,
-        ]);
+        const { rule } = activeRule.get();
         return {
           color: rule?.color,
           label: tierHighlightStore.showLabel ? rule?.label : undefined,
@@ -108,10 +127,16 @@ export default class TierHighlightRenderer extends Renderer.LensExtension {
       ({ color, label }) => render(color, label),
       { fireImmediately: true, equals: (a, b) => a.color === b.color && a.label === b.label }
     );
+
+    const disposeGuard = installGuard(guardState, confirmActions, (message) =>
+      Notifications.error(message)
+    );
+
+    this.disposers.push(disposeFrame, disposeGuard);
   }
 
   onDeactivate() {
-    this.dispose?.();
+    this.disposers.splice(0).forEach((dispose) => dispose());
     render(undefined);
   }
 }

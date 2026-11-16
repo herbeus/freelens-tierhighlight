@@ -1,8 +1,19 @@
 # freelens-tierhighlight
 
 Freelens 2.x extension that draws a colored frame (with a small label) around
-the cluster view, chosen by the cluster name or kubeconfig context. Makes it
-obvious at a glance whether you are working on prod.
+the cluster view, chosen by the cluster name or kubeconfig context, and can
+guard changes on matching clusters:
+
+- `confirm`: before a change you have to type the cluster name
+  (e.g. `shared-k8s-prod`). Several changes at once (bulk delete) are confirmed
+  together.
+- `readonly`: changes are blocked.
+
+Guarded are Kubernetes API writes (delete, edit/save, scale, create, cordon via
+API), Helm install/upgrade/rollback/uninstall, applying resources from the
+editor, and `kubectl`/`helm` commands with a changing verb that are sent to
+the terminal as a whole (menu actions like cordon/drain, pasted commands).
+Commands typed key by key in the terminal are not inspected.
 
 Inspired by `freelens-tierhighlight` (Freelens 1.x, hard-coded names); this is
 a rewrite with configurable rules that reacts to cluster switches.
@@ -16,10 +27,11 @@ and install it on the Freelens Extensions page (path or drag and drop).
 ## Configuration
 
 Preferences -> Extensions -> Tier Highlight. Rules are comma separated
-`pattern=color[:label]`, matched case-insensitively against cluster name and
-kubeconfig context; the first match wins. Default:
+`pattern=color[:label[:mode]]` with mode `none` (default), `confirm` or
+`readonly`, matched case-insensitively against cluster name and kubeconfig
+context; the first match wins. Default:
 
-    prod=#d32f2f, dev=#2e7d32
+    prod=#d32f2f:PROD:confirm, dev=#2e7d32
 
 ## Build
 
