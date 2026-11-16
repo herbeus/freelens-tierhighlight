@@ -27,6 +27,7 @@ const CSS = `
   border-radius: 4px; border: 1px solid var(--inputControlBorder, #666);
   background: var(--inputControlBackground, #1e2125); color: inherit; font: inherit;
 }
+#${DIALOG_ID} .cluster { margin-bottom: 16px; }
 #${DIALOG_ID} .actions { display: flex; justify-content: flex-end; gap: 8px; }
 #${DIALOG_ID} button {
   padding: 6px 14px; border-radius: 4px; border: 0; cursor: pointer; font: inherit;
@@ -43,15 +44,17 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLEl
 }
 
 /**
- * Asks the user to confirm mutating actions by typing the cluster name.
- * Resolves true only on an exact match followed by the confirm button/Enter.
+ * Asks the user to confirm mutating actions, either by typing the cluster name
+ * (confirmStyle "type": exact match, then button/Enter) or by clicking the
+ * button (confirmStyle "click": Enter does not confirm, Cancel has focus).
  */
 export function confirmActions(actions: MutatingAction[], state: GuardState): Promise<boolean> {
   return new Promise((resolve) => {
     document.getElementById(DIALOG_ID)?.remove();
 
     const input = el("input", { type: "text", spellcheck: false, autocomplete: "off", placeholder: state.expected });
-    const ok = el("button", { className: "ok", disabled: true, textContent: "Execute" });
+    const typed = state.confirmStyle !== "click";
+    const ok = el("button", { className: "ok", disabled: typed, textContent: "Execute" });
     const cancel = el("button", { textContent: "Cancel" });
     const count = actions.length === 1 ? "this change" : `these ${actions.length} changes`;
 
@@ -64,8 +67,9 @@ export function confirmActions(actions: MutatingAction[], state: GuardState): Pr
         { className: "box" },
         el("h2", {}, el("span", { className: "badge", textContent: state.label }), `Confirm ${count}`),
         el("ul", {}, ...actions.map((a) => el("li", { textContent: a.summary }))),
-        el("div", {}, "Type ", el("code", { textContent: state.expected }), " to continue:"),
-        input,
+        ...(typed
+          ? [el("div", {}, "Type ", el("code", { textContent: state.expected }), " to continue:"), input]
+          : [el("div", { className: "cluster" }, "Cluster ", el("code", { textContent: state.expected }))]),
         el("div", { className: "actions" }, cancel, ok),
       ),
     );
@@ -76,12 +80,12 @@ export function confirmActions(actions: MutatingAction[], state: GuardState): Pr
       document.removeEventListener("keydown", onKey, true);
       resolve(result);
     };
-    const matches = () => input.value.trim() === state.expected;
+    const matches = () => !typed || input.value.trim() === state.expected;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
         close(false);
-      } else if (e.key === "Enter" && document.activeElement === input && matches()) {
+      } else if (typed && e.key === "Enter" && document.activeElement === input && matches()) {
         e.preventDefault();
         close(true);
       }
@@ -94,6 +98,6 @@ export function confirmActions(actions: MutatingAction[], state: GuardState): Pr
     document.addEventListener("keydown", onKey, true);
 
     document.body.appendChild(root);
-    input.focus();
+    (typed ? input : cancel).focus();
   });
 }

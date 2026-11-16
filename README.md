@@ -26,12 +26,33 @@ and install it on the Freelens Extensions page (path or drag and drop).
 
 ## Configuration
 
-Preferences -> Extensions -> Tier Highlight. Rules are comma separated
-`pattern=color[:label[:mode]]` with mode `none` (default), `confirm` or
-`readonly`, matched case-insensitively against cluster name and kubeconfig
-context; the first match wins. Default:
+Preferences -> Extensions -> Tier Highlight.
+
+**Rules** are comma separated `pattern=color[:label[:mode[:actions]]]`, matched
+case-insensitively against cluster name and kubeconfig context; the first match
+wins. Mode is `none` (default), `confirm` or `readonly`. `actions` optionally
+overrides the guarded changes for this rule, `+` separated
+(`delete+scale+edit+create+helm+node`) or `all`. Default:
 
     prod=#d32f2f:PROD:confirm, dev=#2e7d32
+
+Example with a stage that only guards deletes and Helm:
+
+    prod=#d32f2f:PROD:confirm, stag=#f9a825:STAGE:confirm:delete+helm, dev=#2e7d32
+
+**Appearance:** frame around the view or bar at the top only, border width,
+background tint (0-30 %), label on/off, label position (top/bottom,
+left/center/right) and font size.
+
+**Guard:**
+
+- Guarded changes: delete (incl. evict), scale, edit/patch/restart/label,
+  create/apply, Helm, node (cordon, uncordon, drain, taint). Used by all
+  `confirm`/`readonly` rules without their own `actions`.
+- Confirmation: type the cluster name (paste blocked) or click a button
+  (Enter does not confirm, Cancel has the focus).
+- Namespaces without guard: comma separated, `*` as wildcard (e.g.
+  `sandbox, tmp-*`). Terminal commands count only with `-n`/`--namespace`.
 
 ## Build
 
